@@ -1,11 +1,10 @@
 package com.exchange;
 
-import com.exchange.model.Valute;
+import com.exchange.config.BotData;
+import com.exchange.model.Currency;
 import com.exchange.utils.BotUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -18,24 +17,24 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.util.stream.Collectors;
 
 @Component
-@PropertySource(value = "classpath:/application.properties")
 public class Bot extends TelegramLongPollingBot {
     private static final Logger log = LogManager.getLogger(Bot.class);
-    @Value("${bot.username}")
-    private String botUserName;
-    @Value("${bot.token}")
-    private String botToken;
+    private final BotData botData;
+    private final SettingsComponent settingsComponent;
 
-    public Bot() {}
+    public Bot(BotData botData, SettingsComponent settingsComponent) {
+        this.botData = botData;
+        this.settingsComponent = settingsComponent;
+    }
 
     @Override
     public String getBotUsername() {
-        return botUserName;
+        return botData.getBotUserName();
     }
 
     @Override
     public String getBotToken() {
-        return botToken;
+        return botData.getBotToken();
     }
 
     @Override
@@ -46,24 +45,25 @@ public class Bot extends TelegramLongPollingBot {
             if (message != null && message.hasText()) {
                 switch (message.getText()) {
                     case "/start" -> {
-                        BotUtils.addOrUpdateUser(message.getFrom().getId());
+                        settingsComponent.addOrUpdateUser(message.getFrom().getId());
                         sendMsg(message, "You are welcome!!!");
                     }
                     case "/show" -> {
-                        var stringValCurs = BotUtils.getValutesForUser(message.getFrom().getId())
+                        var stringValCurs = settingsComponent.getCurrencyForUser(message.getFrom().getId())
                                 .values().stream()
-                                .filter(Valute::isSelected)
-                                .map(valute -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(valute.getCharCode()), valute.getNominal(), valute.getName(), valute.getValue()))
+                                .filter(Currency::isSelected)
+                                .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                                 .collect(Collectors.joining());
-                        if (!stringValCurs.equals(""))
+                        if (!stringValCurs.equals("")) {
                             sendMsg(message, "Курсы валют на сегодня:\n" + stringValCurs);
-                        else
+                        } else {
                             sendMsg(message, "Вы не выбрали ни одной валюты.\nИспользуйте /settings, чтобы выбрать.");
+                        }
                     }
                     case "/help" -> sendMsg(message, "Для настройки валют выберите /settings\nДля того, чтобы просмотреть стоимость выбраных валют выберите /show");
                     case "/settings" -> {
-                        BotUtils.addOrUpdateTempUser(message.getFrom().getId());
-                        sendMsgWithButtons(message, "Выберите валюты", BotUtils.updateAndGetKeyboardButtons(message.getFrom().getId()));
+                        settingsComponent.addOrUpdateTempUser(message.getFrom().getId());
+                        sendMsgWithButtons(message, "Выберите валюты", settingsComponent.updateAndGetKeyboardButtons(message.getFrom().getId()));
                     }
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
@@ -71,30 +71,30 @@ public class Bot extends TelegramLongPollingBot {
         } else if (update.hasCallbackQuery()) {
             var callbackQuery = update.getCallbackQuery();
             var callData = callbackQuery.getData();
-            long messageId = callbackQuery.getMessage().getMessageId();
-            long chatId = callbackQuery.getMessage().getChatId();
+            var messageId = callbackQuery.getMessage().getMessageId();
+            var chatId = callbackQuery.getMessage().getChatId();
             EditMessageText editMessageText;
             switch (callData) {
                 case "Done" -> {
-                    BotUtils.saveSettings(callbackQuery.getFrom().getId());
+                    settingsComponent.saveSettings(callbackQuery.getFrom().getId());
                     editMessageText = new EditMessageText()
                             .setChatId(chatId)
-                            .setMessageId((int) messageId)
-                            .setText("Выбраны следующие валюты:\n" + BotUtils.getValuteMapAsString(callbackQuery.getFrom().getId()));
+                            .setMessageId(messageId)
+                            .setText("Выбраны следующие валюты:\n" + settingsComponent.convertMapToString(callbackQuery.getFrom().getId()));
                 }
                 case "Cancel" -> {
-                    BotUtils.cancelSettings(callbackQuery.getFrom().getId());
+                    settingsComponent.cancelSettings(callbackQuery.getFrom().getId());
                     editMessageText = new EditMessageText()
                             .setChatId(chatId)
-                            .setMessageId((int) messageId)
+                            .setMessageId(messageId)
                             .setText("Выбранные валюты не изменились");
                 }
                 default -> {
-                    BotUtils.getValutesForTempUser(callbackQuery.getFrom().getId()).get(callData).changeSelect();
+                    settingsComponent.getCurrencyForTempUser(callbackQuery.getFrom().getId()).get(callData).changeSelect();
                     editMessageText = new EditMessageText()
                             .setChatId(chatId)
-                            .setMessageId((int) messageId)
-                            .setReplyMarkup(BotUtils.updateAndGetKeyboardButtons(callbackQuery.getFrom().getId()))
+                            .setMessageId(messageId)
+                            .setReplyMarkup(settingsComponent.updateAndGetKeyboardButtons(callbackQuery.getFrom().getId()))
                             .setText("Выберите валюты");
                 }
             }

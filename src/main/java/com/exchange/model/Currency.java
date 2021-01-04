@@ -34,7 +34,7 @@ import javax.xml.bind.annotation.*;
         "name",
         "value"
 })
-public class Valute implements Cloneable {
+public class Currency implements Cloneable {
 
     @XmlElement(name = "NumCode")
     @XmlSchemaType(name = "unsignedShort")
@@ -53,7 +53,7 @@ public class Valute implements Cloneable {
     @XmlTransient
     private boolean isSelected;
 
-    public Valute() {
+    public Currency() {
         this.isSelected = false;
     }
 
@@ -206,8 +206,8 @@ public class Valute implements Cloneable {
     }
 
     @Override
-    public Valute clone() throws CloneNotSupportedException {
-        return (Valute) super.clone();
+    public Currency clone() throws CloneNotSupportedException {
+        return (Currency) super.clone();
     }
 
 }

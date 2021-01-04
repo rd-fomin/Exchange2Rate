@@ -43,13 +43,13 @@ import java.util.List;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "", propOrder = {
-        "valutes"
+        "currencies"
 })
 @XmlRootElement(name = "ValCurs")
-public class ValCurs implements Cloneable {
+public class CurrencyCurs implements Cloneable {
 
     @XmlElement(name = "Valute", required = true)
-    protected List<Valute> valutes;
+    protected List<Currency> currencies;
     @XmlAttribute(name = "Date", required = true)
     protected String date;
     @XmlAttribute(name = "name", required = true)
@@ -73,15 +73,15 @@ public class ValCurs implements Cloneable {
      * 
      * <p>
      * Objects of the following type(s) are allowed in the list
-     * {@link Valute }
+     * {@link Currency }
      * 
      * 
      */
-    public List<Valute> getValutes() {
-        if (valutes == null) {
-            valutes = new ArrayList<>();
+    public List<Currency> getValutes() {
+        if (currencies == null) {
+            currencies = new ArrayList<>();
         }
-        return this.valutes;
+        return this.currencies;
     }
 
     /**
@@ -135,15 +135,15 @@ public class ValCurs implements Cloneable {
     @Override
     public String toString() {
         return "ValCurs{" +
-                "valute=" + valutes +
+                "valute=" + currencies +
                 ", date='" + date + '\'' +
                 ", name='" + name + '\'' +
                 '}';
     }
 
     @Override
-    public ValCurs clone() throws CloneNotSupportedException {
-        return (ValCurs) super.clone();
+    public CurrencyCurs clone() throws CloneNotSupportedException {
+        return (CurrencyCurs) super.clone();
     }
 
 }

@@ -1,13 +1,10 @@
 package com.exchange.utils;
 
-import com.exchange.model.ValCurs;
-import com.exchange.model.Valute;
-import com.google.common.collect.Lists;
+import com.exchange.model.CurrencyCurs;
+import com.exchange.model.Currency;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.springframework.stereotype.Component;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -19,12 +16,12 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Component
 public class BotUtils {
-    private static final Logger log = LogManager.getLogger(BotUtils.class);
-    private static final Map<String, String> mapWithCharCodes = Map.copyOf(Map.ofEntries(
+    private static final Logger LOGGER = LogManager.getLogger(BotUtils.class);
+    private static final Map<String, String> MAP_WITH_CHAR_CODES = Map.copyOf(Map.ofEntries(
             Map.entry("CHF", "\uD83C\uDDE8\uD83C\uDDED"),
             Map.entry("KZT", "\uD83C\uDDF0\uD83C\uDDFF"),
             Map.entry("ZAR", "\uD83C\uDDFF\uD83C\uDDE6"),
@@ -60,125 +57,34 @@ public class BotUtils {
             Map.entry("UAH", "\uD83C\uDDFA\uD83C\uDDE6"),
             Map.entry("XDR", "\uD83C\uDFF3️")
     ));
-    private static final Map<Integer, Map<String, Valute>> users = new HashMap<>();
-    private static final Map<Integer, Map<String, Valute>> tempUsers = new HashMap<>();
-    private static Map<String, Valute> VALUTES;
-    private static final InlineKeyboardMarkup inlineKeyboardMarkup;
-    static {
-        var valuteList = getValCursToday().orElseThrow().getValutes();
-        VALUTES = listToMap(valuteList);
-        var keyboardButtons = Lists.partition(valuteList, 2).stream()
-                .map(valutes -> valutes.stream()
-                        .map(valute -> new InlineKeyboardButton().setCallbackData(valute.getCharCode()))
-                        .collect(Collectors.toList()))
-                .collect(Collectors.toList());
-        keyboardButtons.add(
-                List.of(
-                        new InlineKeyboardButton().setText("Cancel").setCallbackData("Cancel"),
-                        new InlineKeyboardButton().setText("Done").setCallbackData("Done")
-                )
-        );
-        inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        inlineKeyboardMarkup.setKeyboard(keyboardButtons);
-    }
 
     private BotUtils() {}
 
-    @Scheduled(cron = "0 5 15 * * ?")
-    public static void setVALUTES() {
-        VALUTES = listToMap(getValCursToday().orElseThrow().getValutes());
-        log.info(VALUTES);
-    }
-
-    public static void addOrUpdateUser(int id) {
-        addOrUpdateUser(id, VALUTES);
-    }
-
-    private static void addOrUpdateUser(int id, Map<String, Valute> valuteList) {
-        users.put(id, new TreeMap<>(valuteList));
-    }
-
-    public static Map<String, Valute> getValutesForUser(int id) {
-        return users.get(id);
-    }
-
-    public static void addOrUpdateTempUser(int id) {
-        Map<String, Valute> map = new TreeMap<>();
-        users.get(id).forEach((key, value) -> {
-            try {
-                map.put(key, value.clone());
-            } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-            }
-        });
-        tempUsers.put(id, map);
-    }
-
-    public static Map<String, Valute> getValutesForTempUser(int id) {
-        return tempUsers.get(id);
-    }
-
     public static String getFlagUnicode(String charCode) {
-        return mapWithCharCodes.get(charCode);
+        return BotUtils.MAP_WITH_CHAR_CODES.get(charCode);
     }
 
-    public static TreeMap<String, Valute> listToMap(List<Valute> valuteList) {
-        return valuteList.stream()
-                .collect(Collectors.toMap(
-                        Valute::getCharCode,
-                        Function.identity(),
-                        (key, valute) -> valute,
-                        TreeMap::new
-                ));
-    }
-
-    public static String getValuteMapAsString(int id) {
-        return users.get(id).values().stream()
-                .filter(Valute::isSelected)
-                .map(valute -> String.format("%s %s\n", getFlagUnicode(valute.getCharCode()), valute.getCharCode()))
-                .collect(Collectors.joining());
-    }
-
-    public static void saveSettings(int id) {
-        addOrUpdateUser(id, tempUsers.remove(id));
-    }
-
-    public static void cancelSettings(int id) {
-        tempUsers.remove(id);
-    }
-
-    public static InlineKeyboardMarkup updateAndGetKeyboardButtons(int id) {
-        inlineKeyboardMarkup.getKeyboard().forEach(inlineKeyboardButtons -> inlineKeyboardButtons
-                .forEach(inlineKeyboardButton -> {
-                    if (!inlineKeyboardButton.getCallbackData().equals("Done") && !inlineKeyboardButton.getCallbackData().equals("Cancel"))
-                        inlineKeyboardButton.setText(String.format("%s %s %s",
-                                getFlagUnicode(inlineKeyboardButton.getCallbackData()),
-                                inlineKeyboardButton.getCallbackData(),
-                                getValutesForTempUser(id).get(inlineKeyboardButton.getCallbackData()).isSelected() ? "✅" : "❌"));
-                }));
-        return inlineKeyboardMarkup;
-    }
-
-    private static Optional<ValCurs> getValCursToday() {
+    public static Optional<List<Currency>> getCurrencyCursFromSite() {
         try {
             URL url = new URL("http://www.cbr.ru/scripts/XML_daily.asp");
             var urlConnection = (HttpURLConnection) url.openConnection();
-            var inputStream = urlConnection.getInputStream();
-            try (var bufferedReader = new BufferedReader(new InputStreamReader(inputStream, "windows-1251"))) {
-                var exchangeRateLine = new StringReader(
-                        bufferedReader.lines().collect(Collectors.joining())
-                );
-                var jaxbContext = JAXBContext.newInstance(ValCurs.class);
+            try (
+                    var inputStream = urlConnection.getInputStream();
+                    var bufReader = new BufferedReader(new InputStreamReader(inputStream, "windows-1251"))
+            ) {
+                var exchangeRateLine = new StringReader(bufReader.lines().collect(Collectors.joining()));
+                var jaxbContext = JAXBContext.newInstance(CurrencyCurs.class);
                 var unmarshaller = jaxbContext.createUnmarshaller();
-                var valCurs = (ValCurs) unmarshaller.unmarshal(exchangeRateLine);
-                return Optional.of(valCurs);
+                var valCurs = (CurrencyCurs) unmarshaller.unmarshal(exchangeRateLine);
+                var currencyList = valCurs.getValutes();
+                return Optional.of(currencyList);
             }
         } catch (MalformedURLException e) {
-            log.error("Something went wrong with connection: " + e.getMessage());
+            LOGGER.error("Something went wrong with connection: " + e.getMessage());
         } catch (JAXBException e) {
-            log.error("Something went wrong with unmarshal: " + e.getMessage());
+            LOGGER.error("Something went wrong with unmarshal: " + e.getMessage());
         } catch (IOException e) {
-            log.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
         return Optional.empty();
     }

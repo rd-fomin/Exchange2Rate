@@ -6,17 +6,18 @@ plugins {
 group 'com.exchange'
 version '1.0-SNAPSHOT'
 
-sourceCompatibility = JavaVersion.VERSION_14
-targetCompatibility = JavaVersion.VERSION_14
+sourceCompatibility = JavaVersion.VERSION_15
+targetCompatibility = JavaVersion.VERSION_15
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    compile('org.telegram:telegrambots-spring-boot-starter:4.9.2')
-    compile('org.apache.logging.log4j:log4j-core:2.14.0')
-    compile('com.sun.xml.bind:jaxb-impl:2.2.11')
-    compile('com.sun.xml.bind:jaxb-core:2.2.11')
-    testCompile('junit:junit:4.12')
+    implementation("org.telegram:telegrambots-spring-boot-starter:${Versions.spring}")
+    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
+    implementation("com.sun.xml.bind:jaxb-impl:${Versions.jaxb}")
+    implementation("com.sun.xml.bind:jaxb-core:${Versions.jaxb}")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:${Versions.junit}")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:${Versions.junit}")
 }
