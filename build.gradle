@@ -1,19 +1,23 @@
 plugins {
+    id 'idea'
     id 'java'
 }
 
-group 'ru.otus'
-version '0.0.1'
+group 'com.exchange'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_15
+targetCompatibility = JavaVersion.VERSION_15
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
-}
-
-test {
-    useJUnitPlatform()
+    implementation("org.telegram:telegrambots-spring-boot-starter:${Versions.spring}")
+    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
+    implementation("com.sun.xml.bind:jaxb-impl:${Versions.jaxb}")
+    implementation("com.sun.xml.bind:jaxb-core:${Versions.jaxb}")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:${Versions.junit}")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:${Versions.junit}")
 }
