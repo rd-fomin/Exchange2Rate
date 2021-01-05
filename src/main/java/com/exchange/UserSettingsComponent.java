@@ -1,6 +1,7 @@
 package com.exchange;
 
 import com.exchange.model.Currency;
+import com.exchange.model.UserSettings;
 import com.exchange.utils.BotUtils;
 import com.google.common.collect.Lists;
 import org.springframework.context.annotation.PropertySource;
@@ -17,13 +18,12 @@ import java.util.stream.Collectors;
 
 @Component
 @PropertySource(value = "classpath:/application.properties")
-public class SettingsComponent {
+public class UserSettingsComponent {
     public Map<String, Currency> currencyMap;
     public final InlineKeyboardMarkup inlineKeyboardMarkup;
-    public final Map<Integer, Map<String, Currency>> usersSettings = new HashMap<>();
-    public final Map<Integer, Map<String, Currency>> tempUsersSettings = new HashMap<>();
+    public final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
 
-    public SettingsComponent() {
+    public UserSettingsComponent() {
         var currencyList = BotUtils.getCurrencyCursFromSite().orElseThrow();
         currencyMap = listToMap(currencyList);
         var keyboardButtons = Lists.partition(currencyList, 2).stream()
@@ -41,57 +41,20 @@ public class SettingsComponent {
         inlineKeyboardMarkup.setKeyboard(keyboardButtons);
     }
 
-    public HashMap<String, Currency> listToMap(List<Currency> currencyList) {
-        return currencyList.stream()
-                .collect(Collectors.toMap(
-                        Currency::getCharCode,
-                        Function.identity(),
-                        (key, currency) -> currency,
-                        HashMap::new
-                ));
+    public void addOrUpdateTempUser(UserSettings userSettings) {
+        tempUsersSettings.put(userSettings.getUserId(), userSettings.getCurrencyCode());
     }
 
-    public String convertMapToString(int id) {
-        return usersSettings.get(id).values().stream()
-                .filter(Currency::isSelected)
-                .map(currency -> String.format("%s %s\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getCharCode()))
-                .collect(Collectors.joining());
-    }
-
-    public void addOrUpdateUser(int id) {
-        addOrUpdateUser(id, currencyMap);
-    }
-
-    private void addOrUpdateUser(int id, Map<String, Currency> currencyMap) {
-        usersSettings.put(id, new HashMap<>(currencyMap));
-    }
-
-    public Map<String, Currency> getCurrencyForUser(int id) {
-        return usersSettings.get(id);
-    }
-
-    public void addOrUpdateTempUser(int id) {
-        Map<String, Currency> map = new HashMap<>();
-        usersSettings.get(id).forEach((key, value) -> {
-            try {
-                map.put(key, value.clone());
-            } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-            }
-        });
-        tempUsersSettings.put(id, map);
-    }
-
-    public Map<String, Currency> getCurrencyForTempUser(int id) {
+    private Map<String, Boolean> getCurrencyForTempUser(int id) {
         return tempUsersSettings.get(id);
     }
 
-    public void saveSettings(int id) {
-        addOrUpdateUser(id, tempUsersSettings.remove(id));
+    public void switchValueForTempUser(int id, String charCode) {
+        tempUsersSettings.get(id).put(charCode, !tempUsersSettings.get(id).get(charCode));
     }
 
-    public void cancelSettings(int id) {
-        tempUsersSettings.remove(id);
+    public Map<String, Boolean> removeTempUserSettings(int id) {
+        return tempUsersSettings.remove(id);
     }
 
     public InlineKeyboardMarkup updateAndGetKeyboardButtons(int id) {
@@ -101,9 +64,19 @@ public class SettingsComponent {
                         inlineKeyboardButton.setText(String.format("%s %s %s",
                                 BotUtils.getFlagUnicode(inlineKeyboardButton.getCallbackData()),
                                 inlineKeyboardButton.getCallbackData(),
-                                getCurrencyForTempUser(id).get(inlineKeyboardButton.getCallbackData()).isSelected() ? "✅" : "❌"));
+                                getCurrencyForTempUser(id).get(inlineKeyboardButton.getCallbackData()) ? "✅" : "❌"));
                 }));
         return inlineKeyboardMarkup;
+    }
+
+    private HashMap<String, Currency> listToMap(List<Currency> currencyList) {
+        return currencyList.stream()
+                .collect(Collectors.toMap(
+                        Currency::getCharCode,
+                        Function.identity(),
+                        (key, currency) -> currency,
+                        HashMap::new
+                ));
     }
 
     @Scheduled(cron = "${bot.cron}")
