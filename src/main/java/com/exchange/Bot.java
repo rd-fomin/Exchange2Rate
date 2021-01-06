@@ -58,12 +58,12 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     case "/show" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(message.getFrom().getId()).getCurrencyCode();
-                        var stringValCurs = userSettingsComponent.currencyMap.values().stream()
+                        var stringValCurs = userSettingsComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
                                 .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                                 .collect(Collectors.joining());
                         if (!stringValCurs.equals("")) {
-                            sendMsg(message, "Курсы валют на сегодня:\n" + stringValCurs);
+                            sendMsg(message, "Курсы валют на *" + userSettingsComponent.getCurrencyDate() + "*:\n" + stringValCurs);
                         } else {
                             sendMsg(message, "Вы не выбрали ни одной валюты.\nИспользуйте */settings*, чтобы выбрать.");
                         }
@@ -72,6 +72,9 @@ public class Bot extends TelegramLongPollingBot {
                     case "/settings" -> {
                         userSettingsComponent.addOrUpdateTempUser(userSettingsService.findByUserId(message.getFrom().getId()));
                         sendMsgWithButtons(message, userSettingsComponent.updateAndGetKeyboardButtons(message.getFrom().getId()));
+                    }
+                    case "/settings2" -> {
+
                     }
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
@@ -134,12 +137,12 @@ public class Bot extends TelegramLongPollingBot {
     private void sendMsgWithNotification() {
         List<UserSettings> userSettings = userSettingsService.findAll();
         userSettings.forEach(userSetting -> {
-            var stringValCurs = userSettingsComponent.currencyMap.values().stream()
+            var stringValCurs = userSettingsComponent.getCurrencyMap().values().stream()
                     .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
                     .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                     .collect(Collectors.joining());
             if (!stringValCurs.equals("")) {
-                stringValCurs = "Курсы валют обновились!\nКурсы валют на сегодня:\n" + stringValCurs;
+                stringValCurs = "Курсы валют обновились!\nКурсы валют на *" + userSettingsComponent.getCurrencyDate() + "*:\n" + stringValCurs;
                 var sendMessage = new SendMessage()
                         .enableMarkdown(true)
                         .enableNotification()

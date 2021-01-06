@@ -19,13 +19,16 @@ import java.util.stream.Collectors;
 @Component
 @PropertySource(value = "classpath:/application.properties")
 public class UserSettingsComponent {
-    public Map<String, Currency> currencyMap;
-    public final InlineKeyboardMarkup inlineKeyboardMarkup;
-    public final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
+    private Map<String, Currency> currencyMap;
+    private String currencyDate;
+    private final InlineKeyboardMarkup inlineKeyboardForCurrencyChoose;
+    private final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
 
     public UserSettingsComponent() {
-        var currencyList = BotUtils.getCurrencyCursFromSite().orElseThrow();
+        var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
+        var currencyList = currencyCurs.getValutes();
         currencyMap = listToMap(currencyList);
+        currencyDate = currencyCurs.getDate();
         var keyboardButtons = Lists.partition(currencyList, 2).stream()
                 .map(currencies -> currencies.stream()
                         .map(currency -> new InlineKeyboardButton().setCallbackData(currency.getCharCode()))
@@ -37,8 +40,16 @@ public class UserSettingsComponent {
                         new InlineKeyboardButton().setText("Done").setCallbackData("Done")
                 )
         );
-        inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        inlineKeyboardMarkup.setKeyboard(keyboardButtons);
+        inlineKeyboardForCurrencyChoose = new InlineKeyboardMarkup();
+        inlineKeyboardForCurrencyChoose.setKeyboard(keyboardButtons);
+    }
+
+    public Map<String, Currency> getCurrencyMap() {
+        return currencyMap;
+    }
+
+    public String getCurrencyDate() {
+        return currencyDate;
     }
 
     public void addOrUpdateTempUser(UserSettings userSettings) {
@@ -58,7 +69,7 @@ public class UserSettingsComponent {
     }
 
     public InlineKeyboardMarkup updateAndGetKeyboardButtons(int id) {
-        inlineKeyboardMarkup.getKeyboard().forEach(inlineKeyboardButtons -> inlineKeyboardButtons
+        inlineKeyboardForCurrencyChoose.getKeyboard().forEach(inlineKeyboardButtons -> inlineKeyboardButtons
                 .forEach(inlineKeyboardButton -> {
                     if (!inlineKeyboardButton.getCallbackData().equals("Done") && !inlineKeyboardButton.getCallbackData().equals("Cancel"))
                         inlineKeyboardButton.setText(String.format("%s %s %s",
@@ -66,7 +77,7 @@ public class UserSettingsComponent {
                                 inlineKeyboardButton.getCallbackData(),
                                 getCurrencyForTempUser(id).get(inlineKeyboardButton.getCallbackData()) ? "✅" : "❌"));
                 }));
-        return inlineKeyboardMarkup;
+        return inlineKeyboardForCurrencyChoose;
     }
 
     private HashMap<String, Currency> listToMap(List<Currency> currencyList) {
@@ -81,7 +92,9 @@ public class UserSettingsComponent {
 
     @Scheduled(cron = "${bot.cron}")
     public void refreshCurrencyRate() {
-        currencyMap = listToMap(BotUtils.getCurrencyCursFromSite().orElseThrow());
+        var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
+        currencyMap = listToMap(currencyCurs.getValutes());
+        currencyDate = currencyCurs.getDate();
     }
 
 }

@@ -1,7 +1,6 @@
 package com.exchange.utils;
 
 import com.exchange.model.CurrencyCurs;
-import com.exchange.model.Currency;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;
@@ -64,7 +63,7 @@ public class BotUtils {
         return BotUtils.MAP_WITH_CHAR_CODES.get(charCode);
     }
 
-    public static Optional<List<Currency>> getCurrencyCursFromSite() {
+    public static Optional<CurrencyCurs> getCurrencyCursFromSite() {
         try {
             URL url = new URL("http://www.cbr.ru/scripts/XML_daily.asp");
             var urlConnection = (HttpURLConnection) url.openConnection();
@@ -75,9 +74,8 @@ public class BotUtils {
                 var exchangeRateLine = new StringReader(bufReader.lines().collect(Collectors.joining()));
                 var jaxbContext = JAXBContext.newInstance(CurrencyCurs.class);
                 var unmarshaller = jaxbContext.createUnmarshaller();
-                var valCurs = (CurrencyCurs) unmarshaller.unmarshal(exchangeRateLine);
-                var currencyList = valCurs.getValutes();
-                return Optional.of(currencyList);
+                var currencyCurs = (CurrencyCurs) unmarshaller.unmarshal(exchangeRateLine);
+                return Optional.of(currencyCurs);
             }
         } catch (MalformedURLException e) {
             LOGGER.error("Something went wrong with connection: " + e.getMessage());
