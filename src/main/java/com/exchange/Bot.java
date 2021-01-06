@@ -6,6 +6,7 @@ import com.exchange.service.UserSettingsService;
 import com.exchange.utils.BotUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,12 +16,13 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
 public class Bot extends TelegramLongPollingBot {
-    private static final Logger log = LogManager.getLogger(Bot.class);
+    private static final Logger LOGGER = LogManager.getLogger(Bot.class);
     private final BotData botData;
     private final UserSettingsComponent userSettingsComponent;
     private final UserSettingsService userSettingsService;
@@ -43,14 +45,14 @@ public class Bot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        log.info(update.toString());
+        LOGGER.info(update.toString());
         if (update.hasMessage()) {
             var message = update.getMessage();
             if (message != null && message.hasText()) {
                 switch (message.getText()) {
                     case "/start" -> {
-                        userSettingsService.save(new UserSettings()
-                                .setUserId(message.getFrom().getId())
+                        userSettingsService.save(
+                                new UserSettings().setUserId(message.getFrom().getId())
                         );
                         sendMsg(message, "You are welcome!!!");
                     }
@@ -69,7 +71,7 @@ public class Bot extends TelegramLongPollingBot {
                     case "/help" -> sendMsg(message, "Для настройки валют выберите */settings*\nДля того, чтобы просмотреть стоимость выбраных валют выберите */show*");
                     case "/settings" -> {
                         userSettingsComponent.addOrUpdateTempUser(userSettingsService.findByUserId(message.getFrom().getId()));
-                        sendMsgWithButtons(message, "Выберите валюты", userSettingsComponent.updateAndGetKeyboardButtons(message.getFrom().getId()));
+                        sendMsgWithButtons(message, userSettingsComponent.updateAndGetKeyboardButtons(message.getFrom().getId()));
                     }
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
@@ -124,33 +126,44 @@ public class Bot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            log.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
     }
 
-    private void sendMsgWithNotification(Message message, String text) {
-        var sendMessage = new SendMessage()
-                .enableMarkdown(true)
-                .enableNotification()
-                .setChatId(message.getChatId())
-                .setText(text);
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            log.error(e.getMessage());
-        }
+    @Scheduled(cron = "${bot.cron.notification}")
+    private void sendMsgWithNotification() {
+        List<UserSettings> userSettings = userSettingsService.findAll();
+        userSettings.forEach(userSetting -> {
+            var stringValCurs = userSettingsComponent.currencyMap.values().stream()
+                    .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
+                    .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
+                    .collect(Collectors.joining());
+            if (!stringValCurs.equals("")) {
+                stringValCurs = "Курсы валют обновились!\nКурсы валют на сегодня:\n" + stringValCurs;
+                var sendMessage = new SendMessage()
+                        .enableMarkdown(true)
+                        .enableNotification()
+                        .setChatId((long) userSetting.getUserId())
+                        .setText(stringValCurs);
+                try {
+                    execute(sendMessage);
+                } catch (TelegramApiException e) {
+                    LOGGER.error(e.getMessage());
+                }
+            }
+        });
     }
 
-    private void sendMsgWithButtons(Message message, String text, ReplyKeyboard inlineKeyboardMarkup) {
+    private void sendMsgWithButtons(Message message, ReplyKeyboard inlineKeyboardMarkup) {
         var sendMessage = new SendMessage()
                 .enableMarkdown(true)
                 .setChatId(message.getChatId())
-                .setText(text)
+                .setText("Выберите валюты")
                 .setReplyMarkup(inlineKeyboardMarkup);
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            log.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
     }
 
