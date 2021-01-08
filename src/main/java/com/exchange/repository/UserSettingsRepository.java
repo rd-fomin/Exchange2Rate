@@ -22,4 +22,9 @@ public interface UserSettingsRepository extends JpaRepository<UserSettings, Inte
     @Query("UPDATE UserSettings u SET u.currencyCode = :currencyCode WHERE u.userId = :userId")
     void updateUserSettings(@Param("userId") int userId, @Param("currencyCode") Map<String, Boolean> currencyCode);
 
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE UserSettings u SET u.currencyValue = :currencyValue WHERE u.userId = :userId")
+    void updateUserValues(@Param("userId") int userId, @Param("currencyValue") Map<String, String> currencyValue);
+
 }

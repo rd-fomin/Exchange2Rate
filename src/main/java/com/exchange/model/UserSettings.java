@@ -50,6 +50,7 @@ public class UserSettings implements Cloneable {
             Map.entry("UAH", false),
             Map.entry("XDR", false)
     ));
+    private Map<String, String> currencyValue = Map.of();
 
     public UserSettings() {}
 
@@ -85,6 +86,18 @@ public class UserSettings implements Cloneable {
 
     public UserSettings setCurrencyCode(Map<String, Boolean> currencyCode) {
         this.currencyCode = currencyCode;
+        return this;
+    }
+
+    @Basic
+    @Type(type = "jsonb")
+    @Column(name = "currency_value")
+    public Map<String, String> getCurrencyValue() {
+        return currencyValue;
+    }
+
+    public UserSettings setCurrencyValue(Map<String, String> currencyValue) {
+        this.currencyValue = currencyValue;
         return this;
     }
 
