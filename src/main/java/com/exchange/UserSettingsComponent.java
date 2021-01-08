@@ -1,11 +1,11 @@
 package com.exchange;
 
+import com.exchange.config.BotCron;
 import com.exchange.model.Currency;
 import com.exchange.model.UserSettings;
 import com.exchange.utils.BotUtils;
-import com.exchange.utils.UserValue;
+import com.exchange.model.UserValue;
 import com.google.common.collect.Lists;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -19,17 +19,18 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
-@PropertySource(value = "classpath:/application.properties")
 public class UserSettingsComponent {
     private Map<String, Currency> currencyMap;
     private String currencyDate;
+    private final BotCron botCron;
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyChoose;
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyValues;
     private final InlineKeyboardMarkup inlineKeyboardNumbers;
     private final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
     private final Map<Integer, UserValue> tempUsersValues = new HashMap<>();
 
-    public UserSettingsComponent() {
+    public UserSettingsComponent(BotCron botCron) {
+        this.botCron = botCron;
         var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
         var currencyList = currencyCurs.getValutes();
         currencyMap = listToMap(currencyList);
@@ -94,7 +95,7 @@ public class UserSettingsComponent {
         );
         keyboardButtons.add(
                 List.of(
-                        new InlineKeyboardButton().setCallbackData("cancel2").setText("Cancel")
+                        new InlineKeyboardButton().setCallbackData("Cancel2").setText("Cancel")
                 )
         );
         inlineKeyboardNumbers = new InlineKeyboardMarkup();
@@ -133,10 +134,6 @@ public class UserSettingsComponent {
         return tempUsersValues.remove(id).setValue(value);
     }
 
-    public UserValue getUserValues(int id) {
-        return tempUsersValues.get(id);
-    }
-
     public UserValue removeUserValues(int id) {
         return tempUsersValues.remove(id);
     }
@@ -171,7 +168,7 @@ public class UserSettingsComponent {
                 ));
     }
 
-    @Scheduled(cron = "${bot.cron}")
+    @Scheduled(cron = "${bot.cron.update}")
     public void refreshCurrencyRate() {
         var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
         currencyMap = listToMap(currencyCurs.getValutes());

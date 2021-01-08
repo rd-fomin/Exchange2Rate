@@ -1,0 +1,5 @@
+bot:
+  url: http://www.cbr.ru/scripts/XML_daily.asp
+  cron:
+    update: 0 5 15 * * ?
+    notify: 0 10 15 * * ?

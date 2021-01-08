@@ -1,4 +1,4 @@
-package com.exchange.utils;
+package com.exchange.model;
 
 public class UserValue {
     private String charCode;

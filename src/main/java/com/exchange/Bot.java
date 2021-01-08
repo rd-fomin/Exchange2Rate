@@ -4,7 +4,7 @@ import com.exchange.config.BotData;
 import com.exchange.model.UserSettings;
 import com.exchange.service.UserSettingsService;
 import com.exchange.utils.BotUtils;
-import com.exchange.utils.UserValue;
+import com.exchange.model.UserValue;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -59,7 +59,7 @@ public class Bot extends TelegramLongPollingBot {
                         );
                         sendMsg(message, "You are welcome!!!");
                     }
-                    case "/show" -> {
+                    case "/showrates" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
                         var collect = userSettingsComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
@@ -69,13 +69,33 @@ public class Bot extends TelegramLongPollingBot {
                                         currency.getName(),
                                         currency.getValue()))
                                 .collect(Collectors.joining());
+                        if (!collect.equals("")) {
+                            sendMsg(message, MessageFormat.format("Курс валют на *{0}*:\n{1}",
+                                    userSettingsComponent.getCurrencyDate(),
+                                    collect));
+                        } else {
+                            sendMsg(message, """
+                                    Вы не выбрали ни одной валюты.
+                                    Используйте */settings*, чтобы выбрать.
+                                    """);
+                        }
+                    }
+                    case "/showsettings" -> {
+                        Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
+                        var collect = userSettingsComponent.getCurrencyMap().values().stream()
+                                .filter(currency -> objectMap.get(currency.getCharCode()))
+                                .map(currency -> MessageFormat.format("{0} {1}\n",
+                                        BotUtils.getFlagUnicode(currency.getCharCode()),
+                                        currency.getCharCode()))
+                                .collect(Collectors.joining());
                         var result = "";
                         if (!collect.equals("")) {
-                            result = MessageFormat.format("Курс валют на *{0}*:\n{1}",
-                                    userSettingsComponent.getCurrencyDate(),
-                                    collect);
+                            result += MessageFormat.format("Выбранные валюты для отслеживания курса:\n{0}", collect);
                         } else {
-                            result = "Вы не выбрали ни одной валюты.\nИспользуйте */settings*, чтобы выбрать.\n";
+                            result += """
+                                    Вы не выбрали ни одной валюты.
+                                    Используйте */settings*, чтобы выбрать.
+                                    """;
                         }
                         Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
                         collect = currencyValue.entrySet().stream()
@@ -84,14 +104,20 @@ public class Bot extends TelegramLongPollingBot {
                                         currency.getKey(),
                                         currency.getValue()))
                                 .collect(Collectors.joining());
-                        if (!collect.equals("")) {
-                            result += MessageFormat.format("Выбранные валюты для отслеживания:\n{0}", collect);
+                        if ("".equals(collect)) {
+                            result += """
+                                    Вы не выбрали ни одной валюты для отслеживания.
+                                    "Используйте */settings2*, чтобы выбрать.
+                                    """;
                         } else {
-                            result += "Вы не выбрали ни одной валюты для отслеживания.\nИспользуйте */settings2*, чтобы выбрать.";
+                            result += MessageFormat.format("Выбранные валюты для отслеживания:\n{0}", collect);
                         }
                         sendMsg(message, result);
                     }
-                    case "/help" -> sendMsg(message, "Для настройки валют выберите */settings*\nДля того, чтобы просмотреть стоимость выбраных валют выберите */show*");
+                    case "/help" -> sendMsg(message, """
+                            Для настройки валют выберите */settings*
+                            "Для того, чтобы просмотреть стоимость выбраных валют выберите */show*
+                            """);
                     case "/settings" -> {
                             userSettingsComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
                             sendMsgWithButtons(message, "Выберите валюты", userSettingsComponent.updateAndGetKeyboardButtons(userId));
@@ -123,6 +149,7 @@ public class Bot extends TelegramLongPollingBot {
                         .setMessageId(messageId)
                         .setText("Выбранные валюты не изменились");
             } else if ("Cancel2".equals(callData)) {
+                userSettingsComponent.removeUserValues(userId);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
@@ -173,15 +200,21 @@ public class Bot extends TelegramLongPollingBot {
                         UserValue userValue = userSettingsComponent.addOrUpdateUserValues(userId, oldNumber);
                         Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
                         if (oldNumber.equals("0")) {
-                            currencyValue.remove(userValue.getCharCode());
-                            userSettingsService.updateUserValues(new UserSettings()
-                                    .setUserId(userId)
-                                    .setCurrencyValue(currencyValue)
-                            );
-                            editMessageText = new EditMessageText()
-                                    .setChatId(chatId)
-                                    .setMessageId(messageId)
-                                    .setText("Валюта " + BotUtils.getFlagUnicode(userValue.getCharCode()) + " " + userValue.getCharCode() + " больше не отслеживается.");
+                            if (currencyValue.remove(userValue.getCharCode()) != null) {
+                                userSettingsService.updateUserValues(new UserSettings()
+                                        .setUserId(userId)
+                                        .setCurrencyValue(currencyValue)
+                                );
+                                editMessageText = new EditMessageText()
+                                        .setChatId(chatId)
+                                        .setMessageId(messageId)
+                                        .setText(MessageFormat.format("Валюта {0} {1} больше не отслеживается.", BotUtils.getFlagUnicode(userValue.getCharCode()), userValue.getCharCode()));
+                            } else {
+                                editMessageText = new EditMessageText()
+                                        .setChatId(chatId)
+                                        .setMessageId(messageId)
+                                        .setText("Отслеживаемые валюты не изменились");
+                            }
                         } else {
                             currencyValue.put(userValue.getCharCode(), userValue.getValue());
                             userSettingsService.updateUserValues(new UserSettings()
@@ -191,7 +224,7 @@ public class Bot extends TelegramLongPollingBot {
                             editMessageText = new EditMessageText()
                                     .setChatId(chatId)
                                     .setMessageId(messageId)
-                                    .setText("Для валюты " + BotUtils.getFlagUnicode(userValue.getCharCode()) + " " + userValue.getCharCode() + " установлено значение " + userValue.getValue() + "%");
+                                    .setText(MessageFormat.format("Для валюты {0} {1} установлено значение {2}%", BotUtils.getFlagUnicode(userValue.getCharCode()), userValue.getCharCode(), userValue.getValue()));
                         }
                     }
                     default -> {
@@ -225,16 +258,16 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "${bot.cron.notification}")
+    @Scheduled(cron = "${bot.cron.notify}")
     private void sendMsgWithNotification() {
         List<UserSettings> userSettings = userSettingsService.findAll();
         userSettings.forEach(userSetting -> {
             var stringValCurs = userSettingsComponent.getCurrencyMap().values().stream()
                     .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
-                    .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
+                    .map(currency -> MessageFormat.format("{0} *{1}* {2}\nСтоимость: *{3}* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                     .collect(Collectors.joining());
             if (!stringValCurs.equals("")) {
-                stringValCurs = "Курсы валют обновились!\nКурсы валют на *" + userSettingsComponent.getCurrencyDate() + "*:\n" + stringValCurs;
+                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", userSettingsComponent.getCurrencyDate(), stringValCurs);
                 var sendMessage = new SendMessage()
                         .enableMarkdown(true)
                         .enableNotification()
@@ -265,7 +298,7 @@ public class Bot extends TelegramLongPollingBot {
     private String getUserSettingsAsString(int id) {
         return userSettingsService.findByUserId(id).getCurrencyCode().entrySet().stream()
                 .filter(Map.Entry::getValue)
-                .map(stringBooleanEntry -> String.format("%s %s\n", BotUtils.getFlagUnicode(stringBooleanEntry.getKey()), stringBooleanEntry.getKey()))
+                .map(stringBooleanEntry -> MessageFormat.format("{0} {1}\n", BotUtils.getFlagUnicode(stringBooleanEntry.getKey()), stringBooleanEntry.getKey()))
                 .collect(Collectors.joining());
     }
 
