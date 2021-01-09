@@ -1,25 +1,8 @@
 package com.exchange.utils;
 
-import com.exchange.model.CurrencyCurs;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.springframework.stereotype.Component;
+import java.util.Map;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.StringReader;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.*;
-import java.util.stream.Collectors;
-
-@Component
 public class BotUtils {
-    private static final Logger LOGGER = LogManager.getLogger(BotUtils.class);
     private static final Map<String, String> MAP_WITH_CHAR_CODES = Map.copyOf(Map.ofEntries(
             Map.entry("CHF", "\uD83C\uDDE8\uD83C\uDDED"),
             Map.entry("KZT", "\uD83C\uDDF0\uD83C\uDDFF"),
@@ -60,31 +43,7 @@ public class BotUtils {
     private BotUtils() {}
 
     public static String getFlagUnicode(String charCode) {
-        return BotUtils.MAP_WITH_CHAR_CODES.get(charCode);
-    }
-
-    public static Optional<CurrencyCurs> getCurrencyCursFromSite() {
-        try {
-            URL url = new URL("http://www.cbr.ru/scripts/XML_daily.asp");
-            var urlConnection = (HttpURLConnection) url.openConnection();
-            try (
-                    var inputStream = urlConnection.getInputStream();
-                    var bufReader = new BufferedReader(new InputStreamReader(inputStream, "windows-1251"))
-            ) {
-                var exchangeRateLine = new StringReader(bufReader.lines().collect(Collectors.joining()));
-                var jaxbContext = JAXBContext.newInstance(CurrencyCurs.class);
-                var unmarshaller = jaxbContext.createUnmarshaller();
-                var currencyCurs = (CurrencyCurs) unmarshaller.unmarshal(exchangeRateLine);
-                return Optional.of(currencyCurs);
-            }
-        } catch (MalformedURLException e) {
-            LOGGER.error("Something went wrong with connection: " + e.getMessage());
-        } catch (JAXBException e) {
-            LOGGER.error("Something went wrong with unmarshal: " + e.getMessage());
-        } catch (IOException e) {
-            LOGGER.error(e.getMessage());
-        }
-        return Optional.empty();
+        return MAP_WITH_CHAR_CODES.get(charCode);
     }
 
 }

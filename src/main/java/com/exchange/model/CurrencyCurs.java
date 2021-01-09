@@ -77,7 +77,7 @@ public class CurrencyCurs implements Cloneable {
      * 
      * 
      */
-    public List<Currency> getValutes() {
+    public List<Currency> getCurrencies() {
         if (currencies == null) {
             currencies = new ArrayList<>();
         }
@@ -134,8 +134,8 @@ public class CurrencyCurs implements Cloneable {
 
     @Override
     public String toString() {
-        return "ValCurs{" +
-                "valute=" + currencies +
+        return "CurrencyCurs{" +
+                "currencies=" + currencies +
                 ", date='" + date + '\'' +
                 ", name='" + name + '\'' +
                 '}';

@@ -12,9 +12,9 @@ public interface UserSettingsService {
 
     List<UserSettings> findAll();
 
-    boolean updateUserSettings(UserSettings userSettings);
+    void updateUserSettings(UserSettings userSettings);
 
-    boolean updateUserValues(UserSettings userSettings);
+    void updateUserValues(UserSettings userSettings);
 
     boolean delete(int id);
 

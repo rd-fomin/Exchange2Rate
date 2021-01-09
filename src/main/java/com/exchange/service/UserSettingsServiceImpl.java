@@ -31,21 +31,13 @@ public class UserSettingsServiceImpl implements UserSettingsService {
     }
 
     @Override
-    public boolean updateUserSettings(UserSettings userSettings) {
-        if (userSettingsRepository.existsByUserId(userSettings.getUserId())) {
-            userSettingsRepository.updateUserSettings(userSettings.getUserId(), userSettings.getCurrencyCode());
-            return true;
-        }
-        return false;
+    public void updateUserSettings(UserSettings userSettings) {
+        userSettingsRepository.updateUserSettings(userSettings.getUserId(), userSettings.getCurrencyCode());
     }
 
     @Override
-    public boolean updateUserValues(UserSettings userSettings) {
-        if (userSettingsRepository.existsByUserId(userSettings.getUserId())) {
-            userSettingsRepository.updateUserValues(userSettings.getUserId(), userSettings.getCurrencyValue());
-            return true;
-        }
-        return false;
+    public void updateUserValues(UserSettings userSettings) {
+        userSettingsRepository.updateUserValues(userSettings.getUserId(), userSettings.getCurrencyValue());
     }
 
     @Override

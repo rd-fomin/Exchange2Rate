@@ -1,40 +1,30 @@
 package com.exchange;
 
-import com.exchange.config.BotCron;
-import com.exchange.model.Currency;
 import com.exchange.model.UserSettings;
-import com.exchange.utils.BotUtils;
 import com.exchange.model.UserValue;
+import com.exchange.utils.BotUtils;
 import com.google.common.collect.Lists;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Component
 public class UserSettingsComponent {
-    private Map<String, Currency> currencyMap;
-    private String currencyDate;
-    private final BotCron botCron;
+    private static final Logger LOGGER = LogManager.getLogger(UserSettingsComponent.class);
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyChoose;
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyValues;
     private final InlineKeyboardMarkup inlineKeyboardNumbers;
     private final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
     private final Map<Integer, UserValue> tempUsersValues = new HashMap<>();
 
-    public UserSettingsComponent(BotCron botCron) {
-        this.botCron = botCron;
-        var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
-        var currencyList = currencyCurs.getValutes();
-        currencyMap = listToMap(currencyList);
-        currencyDate = currencyCurs.getDate();
+    public UserSettingsComponent(CurrencyCursComponent currencyCursComponent) {
+        var currencyList = new ArrayList<>(currencyCursComponent.getCurrencyMap().values());
         var keyboardButtons = Lists.partition(currencyList, 2).stream()
                 .map(currencies -> currencies.stream()
                         .map(currency -> new InlineKeyboardButton().setCallbackData(currency.getCharCode()))
@@ -102,20 +92,8 @@ public class UserSettingsComponent {
         inlineKeyboardNumbers.setKeyboard(keyboardButtons);
     }
 
-    public Map<String, Currency> getCurrencyMap() {
-        return currencyMap;
-    }
-
-    public String getCurrencyDate() {
-        return currencyDate;
-    }
-
     public void addOrUpdateUserSettings(UserSettings userSettings) {
         tempUsersSettings.put(userSettings.getUserId(), userSettings.getCurrencyCode());
-    }
-
-    private Map<String, Boolean> getUserSettings(int id) {
-        return tempUsersSettings.get(id);
     }
 
     public void switchUserSettingsValue(int id, String charCode) {
@@ -145,7 +123,7 @@ public class UserSettingsComponent {
                         inlineKeyboardButton.setText(String.format("%s %s %s",
                                 BotUtils.getFlagUnicode(inlineKeyboardButton.getCallbackData()),
                                 inlineKeyboardButton.getCallbackData(),
-                                getUserSettings(id).get(inlineKeyboardButton.getCallbackData()) ? "✅" : "❌"));
+                                tempUsersSettings.get(id).get(inlineKeyboardButton.getCallbackData()) ? "✅" : "❌"));
                 }));
         return inlineKeyboardForCurrencyChoose;
     }
@@ -156,23 +134,6 @@ public class UserSettingsComponent {
 
     public InlineKeyboardMarkup getInlineKeyboardNumbers() {
         return inlineKeyboardNumbers;
-    }
-
-    private HashMap<String, Currency> listToMap(List<Currency> currencyList) {
-        return currencyList.stream()
-                .collect(Collectors.toMap(
-                        Currency::getCharCode,
-                        Function.identity(),
-                        (key, currency) -> currency,
-                        HashMap::new
-                ));
-    }
-
-    @Scheduled(cron = "${bot.cron.update}")
-    public void refreshCurrencyRate() {
-        var currencyCurs = BotUtils.getCurrencyCursFromSite().orElseThrow();
-        currencyMap = listToMap(currencyCurs.getValutes());
-        currencyDate = currencyCurs.getDate();
     }
 
 }
