@@ -16,6 +16,6 @@ public interface UserSettingsService {
 
     void updateUserValues(UserSettings userSettings);
 
-    boolean delete(int id);
+    void deleteByUserId(int userId);
 
 }

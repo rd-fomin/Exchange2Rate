@@ -41,12 +41,8 @@ public class UserSettingsServiceImpl implements UserSettingsService {
     }
 
     @Override
-    public boolean delete(int id) {
-        if (userSettingsRepository.existsById(id)) {
-            userSettingsRepository.deleteById(id);
-            return true;
-        }
-        return false;
+    public void deleteByUserId(int userId) {
+        userSettingsRepository.deleteByUserId(userId);
     }
 
 }

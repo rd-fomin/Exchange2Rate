@@ -15,7 +15,7 @@ public interface UserSettingsRepository extends JpaRepository<UserSettings, Inte
 
     UserSettings findByUserId(int userId);
 
-    boolean existsByUserId(int userId);
+    void deleteByUserId(int userId);
 
     @Transactional
     @Modifying(clearAutomatically = true)
