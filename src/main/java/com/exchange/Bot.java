@@ -7,7 +7,6 @@ import com.exchange.service.UserSettingsService;
 import com.exchange.utils.BotUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -24,15 +23,15 @@ import java.util.stream.Collectors;
 public class Bot extends TelegramLongPollingBot {
     private static final Logger LOGGER = LogManager.getLogger(Bot.class);
     private final BotData botData;
-    private final UserSettingsComponent userSettingsComponent;
+    private final TempUserComponent tempUserComponent;
     private final UserSettingsService userSettingsService;
-    private final CurrencyCursComponent currencyCursComponent;
+    private final CurrencyRateComponent currencyRateComponent;
 
-    public Bot(BotData botData, UserSettingsComponent userSettingsComponent, UserSettingsService userSettingsService, CurrencyCursComponent currencyCursComponent) {
+    public Bot(BotData botData, TempUserComponent tempUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent currencyRateComponent) {
         this.botData = botData;
-        this.userSettingsComponent = userSettingsComponent;
+        this.tempUserComponent = tempUserComponent;
         this.userSettingsService = userSettingsService;
-        this.currencyCursComponent = currencyCursComponent;
+        this.currencyRateComponent = currencyRateComponent;
     }
 
     @Override
@@ -61,7 +60,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     case "/showrates" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
-                        var collect = currencyCursComponent.getCurrencyMap().values().stream()
+                        var collect = currencyRateComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
                                 .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n",
                                         BotUtils.getFlagUnicode(currency.getCharCode()),
@@ -71,7 +70,7 @@ public class Bot extends TelegramLongPollingBot {
                                 .collect(Collectors.joining());
                         if (!collect.equals("")) {
                             sendMsg(message, MessageFormat.format("Курс валют на *{0}*:\n{1}",
-                                    currencyCursComponent.getCurrencyDate(),
+                                    currencyRateComponent.getCurrencyDate(),
                                     collect));
                         } else {
                             sendMsg(message, """
@@ -82,7 +81,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     case "/showsettings" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
-                        var collect = currencyCursComponent.getCurrencyMap().values().stream()
+                        var collect = currencyRateComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
                                 .map(currency -> MessageFormat.format("{0} {1}\n",
                                         BotUtils.getFlagUnicode(currency.getCharCode()),
@@ -121,10 +120,10 @@ public class Bot extends TelegramLongPollingBot {
                             Для того, чтобы посмотреть все выбранные вами настройки выберите */showsettings*
                             """);
                     case "/settings" -> {
-                            userSettingsComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
-                            sendMsgWithButtons(message, "Выберите валюты", userSettingsComponent.updateAndGetKeyboardButtons(userId));
+                            tempUserComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
+                            sendMsgWithButtons(message, "Выберите валюты", tempUserComponent.updateAndGetKeyboardButtons(userId));
                         }
-                    case "/settings2" -> sendMsgWithButtons(message, "Выберите валюту для отслеживания", userSettingsComponent.getInlineKeyboardButtons());
+                    case "/settings2" -> sendMsgWithButtons(message, "Выберите валюту для отслеживания", tempUserComponent.getInlineKeyboardButtons());
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
             }
@@ -138,36 +137,40 @@ public class Bot extends TelegramLongPollingBot {
             if ("Done".equals(callData)) {
                 userSettingsService.updateUserSettings(new UserSettings()
                         .setUserId(userId)
-                        .setCurrencyCode(userSettingsComponent.removeUserSettings(userId))
+                        .setCurrencyCode(tempUserComponent.removeUserSettings(userId))
                 );
+                var collect = userSettingsService.findByUserId(userId).getCurrencyCode().entrySet().stream()
+                        .filter(Map.Entry::getValue)
+                        .map(stringBooleanEntry -> MessageFormat.format("{0} {1}\n", BotUtils.getFlagUnicode(stringBooleanEntry.getKey()), stringBooleanEntry.getKey()))
+                        .collect(Collectors.joining());
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
-                        .setText(MessageFormat.format("Выбраны следующие валюты:\n{0}", getUserSettingsAsString(userId)));
+                        .setText(MessageFormat.format("Выбраны следующие валюты:\n{0}", collect));
             } else if ("Cancel".equals(callData)) {
-                userSettingsComponent.removeUserSettings(userId);
+                tempUserComponent.removeUserSettings(userId);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
                         .setText("Выбранные валюты не изменились");
             } else if ("Cancel2".equals(callData)) {
-                userSettingsComponent.removeUserValues(userId);
+                tempUserComponent.removeUserValues(userId);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
                         .setText("Отслеживаемые валюты не изменились");
-            } else if (currencyCursComponent.getCurrencyMap().containsKey(callData)) {
-                userSettingsComponent.switchUserSettingsValue(userId, callData);
+            } else if (currencyRateComponent.getCurrencyMap().containsKey(callData)) {
+                tempUserComponent.switchUserSettingsValue(userId, callData);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
-                        .setReplyMarkup(userSettingsComponent.updateAndGetKeyboardButtons(userId))
+                        .setReplyMarkup(tempUserComponent.updateAndGetKeyboardButtons(userId))
                         .setText("Выберите валюты");
             } else {
                 var textMessage = callbackQuery.getMessage().getText();
                 switch (callData) {
                     case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" -> {
-                        String oldNumber = textMessage.substring(textMessage.lastIndexOf(" ") + 1, textMessage.lastIndexOf("%"));
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
                         String newNumber;
                         if (oldNumber.equals("0")) {
                             newNumber = callData;
@@ -179,11 +182,11 @@ public class Bot extends TelegramLongPollingBot {
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(userSettingsComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
                                 .setText(textMessage);
                     }
                     case "c" -> {
-                        String oldNumber = textMessage.substring(textMessage.lastIndexOf(" ") + 1, textMessage.lastIndexOf("%"));
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
                         String newNumber;
                         if (oldNumber.length() == 1) {
                             newNumber = "0";
@@ -194,12 +197,12 @@ public class Bot extends TelegramLongPollingBot {
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(userSettingsComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
                                 .setText(textMessage);
                     }
                     case "ok" -> {
-                        String oldNumber = textMessage.substring(textMessage.lastIndexOf(" ") + 1, textMessage.lastIndexOf("%"));
-                        UserValue userValue = userSettingsComponent.addOrUpdateUserValues(userId, oldNumber);
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
+                        UserValue userValue = tempUserComponent.addOrUpdateUserValues(userId, oldNumber);
                         Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
                         if (oldNumber.equals("0")) {
                             if (currencyValue.remove(userValue.getCharCode()) != null) {
@@ -236,11 +239,11 @@ public class Bot extends TelegramLongPollingBot {
                         if (userSettings.getCurrencyValue().containsKey(charCode)) {
                             percent = userSettings.getCurrencyValue().get(charCode);
                         }
-                        userSettingsComponent.addUserValues(userId, charCode);
+                        tempUserComponent.addUserValues(userId, charCode);
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(userSettingsComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
                                 .setText(MessageFormat.format("Введите процент, на который должна измениться валюта {0} {1}: {2}%", BotUtils.getFlagUnicode(charCode), charCode, percent));
                     }
                 }
@@ -278,16 +281,15 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "${bot.cron.notify}")
-    private synchronized void sendMsgWithNotification() {
+    public synchronized void sendMsgWithNotification() {
         List<UserSettings> userSettings = userSettingsService.findAll();
         userSettings.forEach(userSetting -> {
-            var stringValCurs = currencyCursComponent.getCurrencyMap().values().stream()
+            var stringValCurs = currencyRateComponent.getCurrencyMap().values().stream()
                     .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
                     .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                     .collect(Collectors.joining());
             if (!"".equals(stringValCurs)) {
-                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", currencyCursComponent.getCurrencyDate(), stringValCurs);
+                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", currencyRateComponent.getCurrencyDate(), stringValCurs);
                 var sendMessage = new SendMessage()
                         .enableMarkdown(true)
                         .enableNotification()
@@ -302,11 +304,8 @@ public class Bot extends TelegramLongPollingBot {
         });
     }
 
-    private String getUserSettingsAsString(int id) {
-        return userSettingsService.findByUserId(id).getCurrencyCode().entrySet().stream()
-                .filter(Map.Entry::getValue)
-                .map(stringBooleanEntry -> MessageFormat.format("{0} {1}\n", BotUtils.getFlagUnicode(stringBooleanEntry.getKey()), stringBooleanEntry.getKey()))
-                .collect(Collectors.joining());
+    private String getStrBtwSpaceAndPercent(String textMessage) {
+        return textMessage.substring(textMessage.lastIndexOf(" ") + 1, textMessage.lastIndexOf("%"));
     }
 
 }

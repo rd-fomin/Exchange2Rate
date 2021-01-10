@@ -2,7 +2,7 @@ package com.exchange;
 
 import com.exchange.config.BotUrl;
 import com.exchange.model.Currency;
-import com.exchange.model.CurrencyCurs;
+import com.exchange.model.CurrencyRate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,6 +15,7 @@ import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,13 +23,13 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class CurrencyCursComponent {
-    private static final Logger LOGGER = LogManager.getLogger(CurrencyCursComponent.class);
+public class CurrencyRateComponent {
+    private static final Logger LOGGER = LogManager.getLogger(CurrencyRateComponent.class);
     private final BotUrl botUrl;
     private Map<String, Currency> currencyMap;
     private String currencyDate;
 
-    public CurrencyCursComponent(BotUrl botUrl) {
+    public CurrencyRateComponent(BotUrl botUrl) {
         this.botUrl = botUrl;
         var currencyCurs = currencyCurs().orElseThrow(() -> {
             LOGGER.error("Не получилось обновить данные с сайта");
@@ -43,7 +44,7 @@ public class CurrencyCursComponent {
         return currencyMap;
     }
 
-    public synchronized CurrencyCursComponent setCurrencyMap(Map<String, Currency> currencyMap) {
+    public synchronized CurrencyRateComponent setCurrencyMap(Map<String, Currency> currencyMap) {
         this.currencyMap = currencyMap;
         return this;
     }
@@ -52,7 +53,7 @@ public class CurrencyCursComponent {
         return currencyDate;
     }
 
-    public synchronized CurrencyCursComponent setCurrencyDate(String currencyDate) {
+    public synchronized CurrencyRateComponent setCurrencyDate(String currencyDate) {
         this.currencyDate = currencyDate;
         return this;
     }
@@ -67,7 +68,7 @@ public class CurrencyCursComponent {
                 ));
     }
 
-    public Optional<CurrencyCurs> currencyCurs() {
+    public Optional<CurrencyRate> currencyCurs() {
         try {
             var url = new URL(botUrl.getUrl());
             var urlConnection = (HttpURLConnection) url.openConnection();
@@ -76,16 +77,17 @@ public class CurrencyCursComponent {
                     var bufReader = new BufferedReader(new InputStreamReader(inputStream, "windows-1251"))
             ) {
                 var exchangeRateLine = new StringReader(bufReader.lines().collect(Collectors.joining()));
-                var unmarshaller = JAXBContext.newInstance(CurrencyCurs.class).createUnmarshaller();
-                var currencyCurs = (CurrencyCurs) unmarshaller.unmarshal(exchangeRateLine);
+                var unmarshaller = JAXBContext.newInstance(CurrencyRate.class).createUnmarshaller();
+                var currencyCurs = (CurrencyRate) unmarshaller.unmarshal(exchangeRateLine);
+                LOGGER.info(MessageFormat.format("Данные с сайта ЦБ получены: {0}", currencyCurs));
                 return Optional.of(currencyCurs);
             }
         } catch (MalformedURLException e) {
-            LOGGER.error("Something went wrong with connection: " + e.getMessage());
+            LOGGER.error(MessageFormat.format("Что-то не так с подключением: {0}", e.getMessage()));
         } catch (JAXBException e) {
-            LOGGER.error("Something went wrong with unmarshal: " + e.getMessage());
+            LOGGER.error(MessageFormat.format("Что-то не так с преобразованием объекта из XML: {0}", e.getMessage()));
         } catch (IOException e) {
-            LOGGER.error(e.getMessage());
+            LOGGER.error(MessageFormat.format("Что-то не так: {0}", e.getMessage()));
         }
         return Optional.empty();
     }

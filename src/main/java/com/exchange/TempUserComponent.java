@@ -15,16 +15,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class UserSettingsComponent {
-    private static final Logger LOGGER = LogManager.getLogger(UserSettingsComponent.class);
+public class TempUserComponent {
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyChoose;
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyValues;
     private final InlineKeyboardMarkup inlineKeyboardNumbers;
     private final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
     private final Map<Integer, UserValue> tempUsersValues = new HashMap<>();
 
-    public UserSettingsComponent(CurrencyCursComponent currencyCursComponent) {
-        var currencyList = new ArrayList<>(currencyCursComponent.getCurrencyMap().values());
+    public TempUserComponent(CurrencyRateComponent currencyRateComponent) {
+        var currencyList = new ArrayList<>(currencyRateComponent.getCurrencyMap().values());
         var keyboardButtons = Lists.partition(currencyList, 2).stream()
                 .map(currencies -> currencies.stream()
                         .map(currency -> new InlineKeyboardButton().setCallbackData(currency.getCharCode()))

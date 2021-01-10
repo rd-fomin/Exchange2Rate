@@ -46,7 +46,7 @@ import java.util.List;
         "currencies"
 })
 @XmlRootElement(name = "ValCurs")
-public class CurrencyCurs implements Cloneable {
+public class CurrencyRate implements Cloneable {
 
     @XmlElement(name = "Valute", required = true)
     protected List<Currency> currencies;
@@ -142,8 +142,8 @@ public class CurrencyCurs implements Cloneable {
     }
 
     @Override
-    public CurrencyCurs clone() throws CloneNotSupportedException {
-        return (CurrencyCurs) super.clone();
+    public CurrencyRate clone() throws CloneNotSupportedException {
+        return (CurrencyRate) super.clone();
     }
 
 }
