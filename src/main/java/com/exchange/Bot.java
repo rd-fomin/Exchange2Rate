@@ -1,5 +1,7 @@
 package com.exchange;
 
+import com.exchange.component.CurrencyRateComponent;
+import com.exchange.component.TempUserComponent;
 import com.exchange.config.BotData;
 import com.exchange.model.UserSettings;
 import com.exchange.model.UserValue;
@@ -25,13 +27,13 @@ public class Bot extends TelegramLongPollingBot {
     private final BotData botData;
     private final TempUserComponent tempUserComponent;
     private final UserSettingsService userSettingsService;
-    private final CurrencyRateComponent currencyRateComponent;
+    private final CurrencyRateComponent curRateComponent;
 
-    public Bot(BotData botData, TempUserComponent tempUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent currencyRateComponent) {
+    public Bot(BotData botData, TempUserComponent tempUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent curRateComponent) {
         this.botData = botData;
         this.tempUserComponent = tempUserComponent;
         this.userSettingsService = userSettingsService;
-        this.currencyRateComponent = currencyRateComponent;
+        this.curRateComponent = curRateComponent;
     }
 
     @Override
@@ -60,7 +62,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     case "/showrates" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
-                        var collect = currencyRateComponent.getCurrencyMap().values().stream()
+                        var collect = curRateComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
                                 .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n",
                                         BotUtils.getFlagUnicode(currency.getCharCode()),
@@ -70,7 +72,7 @@ public class Bot extends TelegramLongPollingBot {
                                 .collect(Collectors.joining());
                         if (!collect.equals("")) {
                             sendMsg(message, MessageFormat.format("Курс валют на *{0}*:\n{1}",
-                                    currencyRateComponent.getCurrencyDate(),
+                                    curRateComponent.getCurrencyDate(),
                                     collect));
                         } else {
                             sendMsg(message, """
@@ -81,7 +83,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     case "/showsettings" -> {
                         Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
-                        var collect = currencyRateComponent.getCurrencyMap().values().stream()
+                        var collect = curRateComponent.getCurrencyMap().values().stream()
                                 .filter(currency -> objectMap.get(currency.getCharCode()))
                                 .map(currency -> MessageFormat.format("{0} {1}\n",
                                         BotUtils.getFlagUnicode(currency.getCharCode()),
@@ -159,7 +161,7 @@ public class Bot extends TelegramLongPollingBot {
                         .setChatId(chatId)
                         .setMessageId(messageId)
                         .setText("Отслеживаемые валюты не изменились");
-            } else if (currencyRateComponent.getCurrencyMap().containsKey(callData)) {
+            } else if (curRateComponent.getCurrencyMap().containsKey(callData)) {
                 tempUserComponent.switchUserSettingsValue(userId, callData);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
@@ -281,15 +283,15 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    public synchronized void sendMsgWithNotification() {
+    public void sendMsgWithNotification() {
         List<UserSettings> userSettings = userSettingsService.findAll();
         userSettings.forEach(userSetting -> {
-            var stringValCurs = currencyRateComponent.getCurrencyMap().values().stream()
+            var stringValCurs = curRateComponent.getCurrencyMap().values().stream()
                     .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
                     .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
                     .collect(Collectors.joining());
             if (!"".equals(stringValCurs)) {
-                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", currencyRateComponent.getCurrencyDate(), stringValCurs);
+                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", curRateComponent.getCurrencyDate(), stringValCurs);
                 var sendMessage = new SendMessage()
                         .enableMarkdown(true)
                         .enableNotification()

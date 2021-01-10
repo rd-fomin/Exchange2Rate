@@ -1,11 +1,9 @@
-package com.exchange;
+package com.exchange.component;
 
 import com.exchange.model.UserSettings;
 import com.exchange.model.UserValue;
 import com.exchange.utils.BotUtils;
 import com.google.common.collect.Lists;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 

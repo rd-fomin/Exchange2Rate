@@ -1,10 +1,10 @@
-package com.exchange;
+package com.exchange.service;
 
 import com.exchange.config.BotUrl;
-import com.exchange.model.Currency;
 import com.exchange.model.CurrencyRate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -16,56 +16,15 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.MessageFormat;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class CurrencyRateComponent {
-    private static final Logger LOGGER = LogManager.getLogger(CurrencyRateComponent.class);
+public class RefreshCurrencyRateService {
+    private static final Logger LOGGER = LogManager.getLogger(RefreshCurrencyRateService.class);
     private final BotUrl botUrl;
-    private Map<String, Currency> currencyMap;
-    private String currencyDate;
 
-    public CurrencyRateComponent(BotUrl botUrl) {
+    public RefreshCurrencyRateService(BotUrl botUrl) {
         this.botUrl = botUrl;
-        var currencyCurs = currencyCurs().orElseThrow(() -> {
-            LOGGER.error("Не получилось обновить данные с сайта");
-            throw new RuntimeException("Не получилось обновить данные с сайта");
-        });
-        var currencyList = currencyCurs.getCurrencies();
-        currencyMap = listToMap(currencyList);
-        currencyDate = currencyCurs.getDate();
-    }
-
-    public Map<String, Currency> getCurrencyMap() {
-        return currencyMap;
-    }
-
-    public synchronized CurrencyRateComponent setCurrencyMap(Map<String, Currency> currencyMap) {
-        this.currencyMap = currencyMap;
-        return this;
-    }
-
-    public String getCurrencyDate() {
-        return currencyDate;
-    }
-
-    public synchronized CurrencyRateComponent setCurrencyDate(String currencyDate) {
-        this.currencyDate = currencyDate;
-        return this;
-    }
-
-    public HashMap<String, Currency> listToMap(List<Currency> currencyList) {
-        return currencyList.stream()
-                .collect(Collectors.toMap(
-                        Currency::getCharCode,
-                        Function.identity(),
-                        (key, currency) -> currency,
-                        HashMap::new
-                ));
     }
 
     public Optional<CurrencyRate> currencyCurs() {

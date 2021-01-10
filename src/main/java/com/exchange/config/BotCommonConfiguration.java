@@ -1,8 +1,9 @@
 package com.exchange.config;
 
 import com.exchange.Bot;
-import com.exchange.CurrencyRateComponent;
-import com.exchange.TempUserComponent;
+import com.exchange.component.CurrencyRateComponent;
+import com.exchange.component.TempUserComponent;
+import com.exchange.service.RefreshCurrencyRateService;
 import com.exchange.service.UserSettingsService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,17 +19,17 @@ public class BotCommonConfiguration {
     private static final Logger LOGGER = LogManager.getLogger(BotCommonConfiguration.class);
     private final BotSecurityConfiguration botSecurityConfig;
     private final String botUrl;
-    private UserSettingsService userSettingsService;
+    private final UserSettingsService userSettingsService;
 
-    public BotCommonConfiguration(BotSecurityConfiguration botSecurityConfig, @Value("${bot.url}") String botUrl) {
+    public BotCommonConfiguration(BotSecurityConfiguration botSecurityConfig, @Value("${bot.url}") String botUrl, UserSettingsService userSettingsService) {
         this.botSecurityConfig = botSecurityConfig;
         this.botUrl = botUrl;
+        this.userSettingsService = userSettingsService;
     }
 
     @Bean
-    public Bot bot(TempUserComponent tempUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent currencyRateComponent) {
-        this.userSettingsService = userSettingsService;
-        return new Bot(botSecurityConfig.botData(), tempUserComponent, userSettingsService, currencyRateComponent);
+    public Bot bot() {
+        return new Bot(botSecurityConfig.botData(), tempUserService(), userSettingsService, currencyRateComponent());
     }
 
     @Bean
@@ -37,30 +38,39 @@ public class BotCommonConfiguration {
     }
 
     @Bean
-    public TempUserComponent tempUserComponent(CurrencyRateComponent currencyRateComponent) {
-        return new TempUserComponent(currencyRateComponent);
+    public TempUserComponent tempUserService() {
+        return new TempUserComponent(currencyRateComponent());
     }
 
     @Bean
-    public CurrencyRateComponent curRateComponent(BotUrl botUrl) {
-        return new CurrencyRateComponent(botUrl);
+    public CurrencyRateComponent currencyRateComponent() {
+        var curRateService = refreshCurrencyRateService();
+        var curRate = curRateService.currencyCurs().orElseThrow(() -> {
+            LOGGER.error("Не получилось обновить данные с сайта");
+            throw new RuntimeException("Не получилось обновить данные с сайта");
+        });
+        return new CurrencyRateComponent(curRate.getDate(), curRate.getCurrencies());
+    }
+
+    @Bean
+    public RefreshCurrencyRateService refreshCurrencyRateService() {
+        return new RefreshCurrencyRateService(botUrl());
     }
 
     @Scheduled(cron = "${bot.cron.update}")
     public void refreshCurrencyRate() {
-        var curRateComponent = curRateComponent(botUrl());
-        var curRate = curRateComponent.currencyCurs().orElseThrow(() -> {
+        var curRateService = refreshCurrencyRateService();
+        var curRate = curRateService.currencyCurs().orElseThrow(() -> {
             LOGGER.error("Не получилось обновить данные с сайта");
             throw new RuntimeException("Не получилось обновить данные с сайта");
         });
-        if (curRate.getDate().equals(curRateComponent.getCurrencyDate())) {
+        if (curRate.getDate().equals(currencyRateComponent().getCurrencyDate())) {
             LOGGER.warn("Данные на сайте ЦБ еще не обновились");
         } else {
-            curRateComponent
-                    .setCurrencyMap(curRateComponent.listToMap(curRate.getCurrencies()))
-                    .setCurrencyDate(curRate.getDate());
+            currencyRateComponent().setCurrencyDateAndMap(curRate.getDate(), curRate.getCurrencies());
             LOGGER.info("Данные обновлены");
-            bot(tempUserComponent(curRateComponent), userSettingsService, curRateComponent).sendMsgWithNotification();
+            bot().sendMsgWithNotification();
+            LOGGER.info("Уведомления пользователям отправлены");
         }
     }
 
