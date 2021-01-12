@@ -8,17 +8,10 @@ import org.springframework.context.annotation.PropertySource;
 @Configuration
 @PropertySource(value = "classpath:/application-security.properties")
 public class BotSecurityConfiguration {
-    private final String botUserName;
-    private final String botToken;
-
-    public BotSecurityConfiguration(@Value("${bot.username}") String botUserName, @Value("${bot.token}") String botToken) {
-        this.botUserName = botUserName;
-        this.botToken = botToken;
-    }
 
     @Bean
-    public BotData botData() {
-        return new BotData(botUserName, botToken);
+    public BotConfiguration botData(@Value("${bot.username}") String botUserName, @Value("${bot.token}") String botToken, @Value("${bot.url}") String botUrl) {
+        return new BotConfiguration(botUserName, botToken, botUrl);
     }
 
 }

@@ -1,8 +1,8 @@
 package com.exchange;
 
 import com.exchange.component.CurrencyRateComponent;
-import com.exchange.component.TempUserComponent;
-import com.exchange.config.BotData;
+import com.exchange.component.WorkWithTemporaryUserComponent;
+import com.exchange.config.BotConfiguration;
 import com.exchange.model.UserSettings;
 import com.exchange.model.UserValue;
 import com.exchange.service.UserSettingsService;
@@ -24,26 +24,26 @@ import java.util.stream.Collectors;
 
 public class Bot extends TelegramLongPollingBot {
     private static final Logger LOGGER = LogManager.getLogger(Bot.class);
-    private final BotData botData;
-    private final TempUserComponent tempUserComponent;
+    private final BotConfiguration botConfiguration;
+    private final WorkWithTemporaryUserComponent workWithTemporaryUserComponent;
     private final UserSettingsService userSettingsService;
     private final CurrencyRateComponent curRateComponent;
 
-    public Bot(BotData botData, TempUserComponent tempUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent curRateComponent) {
-        this.botData = botData;
-        this.tempUserComponent = tempUserComponent;
+    public Bot(BotConfiguration botConfiguration, WorkWithTemporaryUserComponent workWithTemporaryUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent curRateComponent) {
+        this.botConfiguration = botConfiguration;
+        this.workWithTemporaryUserComponent = workWithTemporaryUserComponent;
         this.userSettingsService = userSettingsService;
         this.curRateComponent = curRateComponent;
     }
 
     @Override
     public String getBotUsername() {
-        return botData.getBotUserName();
+        return botConfiguration.getBotUserName();
     }
 
     @Override
     public String getBotToken() {
-        return botData.getBotToken();
+        return botConfiguration.getBotToken();
     }
 
     @Override
@@ -122,10 +122,10 @@ public class Bot extends TelegramLongPollingBot {
                             Для того, чтобы посмотреть все выбранные вами настройки выберите */showsettings*
                             """);
                     case "/settings" -> {
-                            tempUserComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
-                            sendMsgWithButtons(message, "Выберите валюты", tempUserComponent.updateAndGetKeyboardButtons(userId));
+                            workWithTemporaryUserComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
+                            sendMsgWithButtons(message, "Выберите валюты", workWithTemporaryUserComponent.updateAndGetKeyboardButtons(userId));
                         }
-                    case "/settings2" -> sendMsgWithButtons(message, "Выберите валюту для отслеживания", tempUserComponent.getInlineKeyboardButtons());
+                    case "/settings2" -> sendMsgWithButtons(message, "Выберите валюту для отслеживания", workWithTemporaryUserComponent.getInlineKeyboardButtons());
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
             }
@@ -139,7 +139,7 @@ public class Bot extends TelegramLongPollingBot {
             if ("Done".equals(callData)) {
                 userSettingsService.updateUserSettings(new UserSettings()
                         .setUserId(userId)
-                        .setCurrencyCode(tempUserComponent.removeUserSettings(userId))
+                        .setCurrencyCode(workWithTemporaryUserComponent.removeUserSettings(userId))
                 );
                 var collect = userSettingsService.findByUserId(userId).getCurrencyCode().entrySet().stream()
                         .filter(Map.Entry::getValue)
@@ -150,23 +150,23 @@ public class Bot extends TelegramLongPollingBot {
                         .setMessageId(messageId)
                         .setText(MessageFormat.format("Выбраны следующие валюты:\n{0}", collect));
             } else if ("Cancel".equals(callData)) {
-                tempUserComponent.removeUserSettings(userId);
+                workWithTemporaryUserComponent.removeUserSettings(userId);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
                         .setText("Выбранные валюты не изменились");
             } else if ("Cancel2".equals(callData)) {
-                tempUserComponent.removeUserValues(userId);
+                workWithTemporaryUserComponent.removeUserValues(userId);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
                         .setText("Отслеживаемые валюты не изменились");
             } else if (curRateComponent.getCurrencyMap().containsKey(callData)) {
-                tempUserComponent.switchUserSettingsValue(userId, callData);
+                workWithTemporaryUserComponent.switchUserSettingsValue(userId, callData);
                 editMessageText = new EditMessageText()
                         .setChatId(chatId)
                         .setMessageId(messageId)
-                        .setReplyMarkup(tempUserComponent.updateAndGetKeyboardButtons(userId))
+                        .setReplyMarkup(workWithTemporaryUserComponent.updateAndGetKeyboardButtons(userId))
                         .setText("Выберите валюты");
             } else {
                 var textMessage = callbackQuery.getMessage().getText();
@@ -184,7 +184,7 @@ public class Bot extends TelegramLongPollingBot {
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
                                 .setText(textMessage);
                     }
                     case "c" -> {
@@ -199,12 +199,12 @@ public class Bot extends TelegramLongPollingBot {
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
                                 .setText(textMessage);
                     }
                     case "ok" -> {
                         String oldNumber = getStrBtwSpaceAndPercent(textMessage);
-                        UserValue userValue = tempUserComponent.addOrUpdateUserValues(userId, oldNumber);
+                        UserValue userValue = workWithTemporaryUserComponent.addOrUpdateUserValues(userId, oldNumber);
                         Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
                         if (oldNumber.equals("0")) {
                             if (currencyValue.remove(userValue.getCharCode()) != null) {
@@ -241,11 +241,11 @@ public class Bot extends TelegramLongPollingBot {
                         if (userSettings.getCurrencyValue().containsKey(charCode)) {
                             percent = userSettings.getCurrencyValue().get(charCode);
                         }
-                        tempUserComponent.addUserValues(userId, charCode);
+                        workWithTemporaryUserComponent.addUserValues(userId, charCode);
                         editMessageText = new EditMessageText()
                                 .setChatId(chatId)
                                 .setMessageId(messageId)
-                                .setReplyMarkup(tempUserComponent.getInlineKeyboardNumbers())
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
                                 .setText(MessageFormat.format("Введите процент, на который должна измениться валюта {0} {1}: {2}%", BotUtils.getFlagUnicode(charCode), charCode, percent));
                     }
                 }

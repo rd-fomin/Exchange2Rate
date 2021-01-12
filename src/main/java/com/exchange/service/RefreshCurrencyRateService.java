@@ -1,6 +1,6 @@
 package com.exchange.service;
 
-import com.exchange.config.BotUrl;
+import com.exchange.config.BotConfiguration;
 import com.exchange.model.CurrencyRate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,17 +19,18 @@ import java.text.MessageFormat;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Service
 public class RefreshCurrencyRateService {
     private static final Logger LOGGER = LogManager.getLogger(RefreshCurrencyRateService.class);
-    private final BotUrl botUrl;
+    private final BotConfiguration botConfiguration;
 
-    public RefreshCurrencyRateService(BotUrl botUrl) {
-        this.botUrl = botUrl;
+    public RefreshCurrencyRateService(BotConfiguration botConfiguration) {
+        this.botConfiguration = botConfiguration;
     }
 
     public Optional<CurrencyRate> currencyCurs() {
         try {
-            var url = new URL(botUrl.getUrl());
+            var url = new URL(botConfiguration.getBotUrl());
             var urlConnection = (HttpURLConnection) url.openConnection();
             try (
                     var inputStream = urlConnection.getInputStream();

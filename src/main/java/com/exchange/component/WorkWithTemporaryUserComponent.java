@@ -4,6 +4,7 @@ import com.exchange.model.UserSettings;
 import com.exchange.model.UserValue;
 import com.exchange.utils.BotUtils;
 import com.google.common.collect.Lists;
+import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
@@ -13,14 +14,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class TempUserComponent {
+@Component
+public class WorkWithTemporaryUserComponent {
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyChoose;
     private final InlineKeyboardMarkup inlineKeyboardForCurrencyValues;
     private final InlineKeyboardMarkup inlineKeyboardNumbers;
     private final Map<Integer, Map<String, Boolean>> tempUsersSettings = new HashMap<>();
     private final Map<Integer, UserValue> tempUsersValues = new HashMap<>();
 
-    public TempUserComponent(CurrencyRateComponent currencyRateComponent) {
+    public WorkWithTemporaryUserComponent(CurrencyRateComponent currencyRateComponent) {
         var currencyList = new ArrayList<>(currencyRateComponent.getCurrencyMap().values());
         var keyboardButtons = Lists.partition(currencyList, 2).stream()
                 .map(currencies -> currencies.stream()
