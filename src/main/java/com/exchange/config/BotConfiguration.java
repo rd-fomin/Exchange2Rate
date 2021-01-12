@@ -1,12 +1,14 @@
 package com.exchange.config;
 
-public class BotData {
+public class BotConfiguration {
     private final String botUserName;
     private final String botToken;
+    private final String botUrl;
 
-    public BotData(String botUserName, String botToken) {
+    public BotConfiguration(String botUserName, String botToken, String botUrl) {
         this.botUserName = botUserName;
         this.botToken = botToken;
+        this.botUrl = botUrl;
     }
 
     public String getBotUserName() {
@@ -16,4 +18,9 @@ public class BotData {
     public String getBotToken() {
         return botToken;
     }
+
+    public String getBotUrl() {
+        return botUrl;
+    }
+
 }

@@ -1,0 +1,3 @@
+bot:
+  cron:
+    update: 0 10 15 * * ?

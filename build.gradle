@@ -18,6 +18,9 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
     implementation("com.sun.xml.bind:jaxb-impl:${Versions.jaxb}")
     implementation("com.sun.xml.bind:jaxb-core:${Versions.jaxb}")
+    implementation("org.postgresql:postgresql:${Versions.postgresql}")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:${Versions.springData}")
+    implementation("com.vladmihalcea:hibernate-types-52:2.10.1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:${Versions.junit}")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:${Versions.junit}")
 }

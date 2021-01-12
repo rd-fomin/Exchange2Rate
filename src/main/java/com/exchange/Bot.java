@@ -1,11 +1,14 @@
 package com.exchange;
 
-import com.exchange.config.BotData;
-import com.exchange.model.Currency;
+import com.exchange.component.CurrencyRateComponent;
+import com.exchange.component.WorkWithTemporaryUserComponent;
+import com.exchange.config.BotConfiguration;
+import com.exchange.model.UserSettings;
+import com.exchange.model.UserValue;
+import com.exchange.service.UserSettingsService;
 import com.exchange.utils.BotUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -14,57 +17,115 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.text.MessageFormat;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-@Component
 public class Bot extends TelegramLongPollingBot {
-    private static final Logger log = LogManager.getLogger(Bot.class);
-    private final BotData botData;
-    private final SettingsComponent settingsComponent;
+    private static final Logger LOGGER = LogManager.getLogger(Bot.class);
+    private final BotConfiguration botConfiguration;
+    private final WorkWithTemporaryUserComponent workWithTemporaryUserComponent;
+    private final UserSettingsService userSettingsService;
+    private final CurrencyRateComponent curRateComponent;
 
-    public Bot(BotData botData, SettingsComponent settingsComponent) {
-        this.botData = botData;
-        this.settingsComponent = settingsComponent;
+    public Bot(BotConfiguration botConfiguration, WorkWithTemporaryUserComponent workWithTemporaryUserComponent, UserSettingsService userSettingsService, CurrencyRateComponent curRateComponent) {
+        this.botConfiguration = botConfiguration;
+        this.workWithTemporaryUserComponent = workWithTemporaryUserComponent;
+        this.userSettingsService = userSettingsService;
+        this.curRateComponent = curRateComponent;
     }
 
     @Override
     public String getBotUsername() {
-        return botData.getBotUserName();
+        return botConfiguration.getBotUserName();
     }
 
     @Override
     public String getBotToken() {
-        return botData.getBotToken();
+        return botConfiguration.getBotToken();
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        log.info(update.toString());
+        LOGGER.info(update.toString());
         if (update.hasMessage()) {
             var message = update.getMessage();
             if (message != null && message.hasText()) {
+                var userId = message.getFrom().getId();
                 switch (message.getText()) {
                     case "/start" -> {
-                        settingsComponent.addOrUpdateUser(message.getFrom().getId());
+                        userSettingsService.save(
+                                new UserSettings().setUserId(userId)
+                        );
                         sendMsg(message, "You are welcome!!!");
                     }
-                    case "/show" -> {
-                        var stringValCurs = settingsComponent.getCurrencyForUser(message.getFrom().getId())
-                                .values().stream()
-                                .filter(Currency::isSelected)
-                                .map(currency -> String.format("%s *%s* %s\nСтоимость: *%s* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
+                    case "/showrates" -> {
+                        Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
+                        var collect = curRateComponent.getCurrencyMap().values().stream()
+                                .filter(currency -> objectMap.get(currency.getCharCode()))
+                                .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n",
+                                        BotUtils.getFlagUnicode(currency.getCharCode()),
+                                        currency.getNominal(),
+                                        currency.getName(),
+                                        currency.getValue()))
                                 .collect(Collectors.joining());
-                        if (!stringValCurs.equals("")) {
-                            sendMsg(message, "Курсы валют на сегодня:\n" + stringValCurs);
+                        if (!collect.equals("")) {
+                            sendMsg(message, MessageFormat.format("Курс валют на *{0}*:\n{1}",
+                                    curRateComponent.getCurrencyDate(),
+                                    collect));
                         } else {
-                            sendMsg(message, "Вы не выбрали ни одной валюты.\nИспользуйте /settings, чтобы выбрать.");
+                            sendMsg(message, """
+                                    Вы не выбрали ни одной валюты.
+                                    Используйте */settings*, чтобы выбрать.
+                                    """);
                         }
                     }
-                    case "/help" -> sendMsg(message, "Для настройки валют выберите /settings\nДля того, чтобы просмотреть стоимость выбраных валют выберите /show");
-                    case "/settings" -> {
-                        settingsComponent.addOrUpdateTempUser(message.getFrom().getId());
-                        sendMsgWithButtons(message, "Выберите валюты", settingsComponent.updateAndGetKeyboardButtons(message.getFrom().getId()));
+                    case "/showsettings" -> {
+                        Map<String, Boolean> objectMap = userSettingsService.findByUserId(userId).getCurrencyCode();
+                        var collect = curRateComponent.getCurrencyMap().values().stream()
+                                .filter(currency -> objectMap.get(currency.getCharCode()))
+                                .map(currency -> MessageFormat.format("{0} {1}\n",
+                                        BotUtils.getFlagUnicode(currency.getCharCode()),
+                                        currency.getCharCode()))
+                                .collect(Collectors.joining());
+                        var result = "";
+                        if (!collect.equals("")) {
+                            result += MessageFormat.format("Выбранные валюты для отслеживания курса:\n{0}", collect);
+                        } else {
+                            result += """
+                                    Вы не выбрали ни одной валюты.
+                                    Используйте */settings*, чтобы выбрать.
+                                    """;
+                        }
+                        Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
+                        collect = currencyValue.entrySet().stream()
+                                .map(currency -> MessageFormat.format("{0} {1} ({2}%)\n",
+                                        BotUtils.getFlagUnicode(currency.getKey()),
+                                        currency.getKey(),
+                                        currency.getValue()))
+                                .collect(Collectors.joining());
+                        if ("".equals(collect)) {
+                            result += """
+                                    Вы не выбрали ни одной валюты для отслеживания отклонения.
+                                    "Используйте */settings2*, чтобы выбрать.
+                                    """;
+                        } else {
+                            result += MessageFormat.format("Выбранные валюты для отслеживания:\n{0}", collect);
+                        }
+                        sendMsg(message, result);
                     }
+                    case "/help" -> sendMsg(message, """
+                            Для того, чтобы просмотреть стоимость выбраных валют выберите */showrates*
+                            Для того, чтобы выбрать валюты для отслеживания курса выберите */settings*
+                            Для настройки отслеживания отклонений курса валют выберите */settings2*
+                            Для того, чтобы посмотреть все выбранные вами настройки выберите */showsettings*
+                            """);
+                    case "/settings" -> {
+                            workWithTemporaryUserComponent.addOrUpdateUserSettings(userSettingsService.findByUserId(userId));
+                            sendMsgWithButtons(message, "Выберите валюты", workWithTemporaryUserComponent.updateAndGetKeyboardButtons(userId));
+                        }
+                    case "/settings2" -> sendMsgWithButtons(message, "Выберите валюту для отслеживания", workWithTemporaryUserComponent.getInlineKeyboardButtons());
                     default -> sendMsg(message, "Не понимаю \uD83D\uDE14");
                 }
             }
@@ -73,35 +134,126 @@ public class Bot extends TelegramLongPollingBot {
             var callData = callbackQuery.getData();
             var messageId = callbackQuery.getMessage().getMessageId();
             var chatId = callbackQuery.getMessage().getChatId();
+            var userId = callbackQuery.getFrom().getId();
             EditMessageText editMessageText;
-            switch (callData) {
-                case "Done" -> {
-                    settingsComponent.saveSettings(callbackQuery.getFrom().getId());
-                    editMessageText = new EditMessageText()
-                            .setChatId(chatId)
-                            .setMessageId(messageId)
-                            .setText("Выбраны следующие валюты:\n" + settingsComponent.convertMapToString(callbackQuery.getFrom().getId()));
-                }
-                case "Cancel" -> {
-                    settingsComponent.cancelSettings(callbackQuery.getFrom().getId());
-                    editMessageText = new EditMessageText()
-                            .setChatId(chatId)
-                            .setMessageId(messageId)
-                            .setText("Выбранные валюты не изменились");
-                }
-                default -> {
-                    settingsComponent.getCurrencyForTempUser(callbackQuery.getFrom().getId()).get(callData).changeSelect();
-                    editMessageText = new EditMessageText()
-                            .setChatId(chatId)
-                            .setMessageId(messageId)
-                            .setReplyMarkup(settingsComponent.updateAndGetKeyboardButtons(callbackQuery.getFrom().getId()))
-                            .setText("Выберите валюты");
+            if ("Done".equals(callData)) {
+                userSettingsService.updateUserSettings(new UserSettings()
+                        .setUserId(userId)
+                        .setCurrencyCode(workWithTemporaryUserComponent.removeUserSettings(userId))
+                );
+                var collect = userSettingsService.findByUserId(userId).getCurrencyCode().entrySet().stream()
+                        .filter(Map.Entry::getValue)
+                        .map(stringBooleanEntry -> MessageFormat.format("{0} {1}\n", BotUtils.getFlagUnicode(stringBooleanEntry.getKey()), stringBooleanEntry.getKey()))
+                        .collect(Collectors.joining());
+                editMessageText = new EditMessageText()
+                        .setChatId(chatId)
+                        .setMessageId(messageId)
+                        .setText(MessageFormat.format("Выбраны следующие валюты:\n{0}", collect));
+            } else if ("Cancel".equals(callData)) {
+                workWithTemporaryUserComponent.removeUserSettings(userId);
+                editMessageText = new EditMessageText()
+                        .setChatId(chatId)
+                        .setMessageId(messageId)
+                        .setText("Выбранные валюты не изменились");
+            } else if ("Cancel2".equals(callData)) {
+                workWithTemporaryUserComponent.removeUserValues(userId);
+                editMessageText = new EditMessageText()
+                        .setChatId(chatId)
+                        .setMessageId(messageId)
+                        .setText("Отслеживаемые валюты не изменились");
+            } else if (curRateComponent.getCurrencyMap().containsKey(callData)) {
+                workWithTemporaryUserComponent.switchUserSettingsValue(userId, callData);
+                editMessageText = new EditMessageText()
+                        .setChatId(chatId)
+                        .setMessageId(messageId)
+                        .setReplyMarkup(workWithTemporaryUserComponent.updateAndGetKeyboardButtons(userId))
+                        .setText("Выберите валюты");
+            } else {
+                var textMessage = callbackQuery.getMessage().getText();
+                switch (callData) {
+                    case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" -> {
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
+                        String newNumber;
+                        if (oldNumber.equals("0")) {
+                            newNumber = callData;
+                        } else {
+                            newNumber = oldNumber + callData;
+                        }
+                        if (Integer.parseInt(newNumber) <= 500)
+                            textMessage = textMessage.replace(oldNumber, newNumber);
+                        editMessageText = new EditMessageText()
+                                .setChatId(chatId)
+                                .setMessageId(messageId)
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
+                                .setText(textMessage);
+                    }
+                    case "c" -> {
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
+                        String newNumber;
+                        if (oldNumber.length() == 1) {
+                            newNumber = "0";
+                        } else {
+                            newNumber = oldNumber.substring(0, oldNumber.length() - 1);
+                        }
+                        textMessage = textMessage.replace(oldNumber, newNumber);
+                        editMessageText = new EditMessageText()
+                                .setChatId(chatId)
+                                .setMessageId(messageId)
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
+                                .setText(textMessage);
+                    }
+                    case "ok" -> {
+                        String oldNumber = getStrBtwSpaceAndPercent(textMessage);
+                        UserValue userValue = workWithTemporaryUserComponent.addOrUpdateUserValues(userId, oldNumber);
+                        Map<String, String> currencyValue = userSettingsService.findByUserId(userId).getCurrencyValue();
+                        if (oldNumber.equals("0")) {
+                            if (currencyValue.remove(userValue.getCharCode()) != null) {
+                                userSettingsService.updateUserValues(new UserSettings()
+                                        .setUserId(userId)
+                                        .setCurrencyValue(currencyValue)
+                                );
+                                editMessageText = new EditMessageText()
+                                        .setChatId(chatId)
+                                        .setMessageId(messageId)
+                                        .setText(MessageFormat.format("Валюта {0} {1} больше не отслеживается.", BotUtils.getFlagUnicode(userValue.getCharCode()), userValue.getCharCode()));
+                            } else {
+                                editMessageText = new EditMessageText()
+                                        .setChatId(chatId)
+                                        .setMessageId(messageId)
+                                        .setText("Отслеживаемые валюты не изменились");
+                            }
+                        } else {
+                            currencyValue.put(userValue.getCharCode(), userValue.getValue());
+                            userSettingsService.updateUserValues(new UserSettings()
+                                    .setUserId(userId)
+                                    .setCurrencyValue(currencyValue)
+                            );
+                            editMessageText = new EditMessageText()
+                                    .setChatId(chatId)
+                                    .setMessageId(messageId)
+                                    .setText(MessageFormat.format("Для валюты {0} {1} установлено значение {2}%", BotUtils.getFlagUnicode(userValue.getCharCode()), userValue.getCharCode(), userValue.getValue()));
+                        }
+                    }
+                    default -> {
+                        String charCode = callData.replace("2", "");
+                        UserSettings userSettings = userSettingsService.findByUserId(userId);
+                        String percent = "0";
+                        if (userSettings.getCurrencyValue().containsKey(charCode)) {
+                            percent = userSettings.getCurrencyValue().get(charCode);
+                        }
+                        workWithTemporaryUserComponent.addUserValues(userId, charCode);
+                        editMessageText = new EditMessageText()
+                                .setChatId(chatId)
+                                .setMessageId(messageId)
+                                .setReplyMarkup(workWithTemporaryUserComponent.getInlineKeyboardNumbers())
+                                .setText(MessageFormat.format("Введите процент, на который должна измениться валюта {0} {1}: {2}%", BotUtils.getFlagUnicode(charCode), charCode, percent));
+                    }
                 }
             }
             try {
                 execute(editMessageText);
             } catch (TelegramApiException e) {
-                e.printStackTrace();
+                LOGGER.error(e.getMessage());
             }
         }
     }
@@ -114,20 +266,7 @@ public class Bot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            log.error(e.getMessage());
-        }
-    }
-
-    private void sendMsgWithNotification(Message message, String text) {
-        var sendMessage = new SendMessage()
-                .enableMarkdown(true)
-                .enableNotification()
-                .setChatId(message.getChatId())
-                .setText(text);
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            log.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
     }
 
@@ -140,8 +279,35 @@ public class Bot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            log.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
+    }
+
+    public void sendMsgWithNotification() {
+        List<UserSettings> userSettings = userSettingsService.findAll();
+        userSettings.forEach(userSetting -> {
+            var stringValCurs = curRateComponent.getCurrencyMap().values().stream()
+                    .filter(currency -> userSetting.getCurrencyCode().get(currency.getCharCode()))
+                    .map(currency -> MessageFormat.format("{0} *{1}* {2}\nКурс: *{3}* \u20BD\n", BotUtils.getFlagUnicode(currency.getCharCode()), currency.getNominal(), currency.getName(), currency.getValue()))
+                    .collect(Collectors.joining());
+            if (!"".equals(stringValCurs)) {
+                stringValCurs = MessageFormat.format("Курсы валют обновились!\nКурсы валют на *{0}*:\n{1}", curRateComponent.getCurrencyDate(), stringValCurs);
+                var sendMessage = new SendMessage()
+                        .enableMarkdown(true)
+                        .enableNotification()
+                        .setChatId((long) userSetting.getUserId())
+                        .setText(stringValCurs);
+                try {
+                    execute(sendMessage);
+                } catch (TelegramApiException e) {
+                    LOGGER.error(e.getMessage());
+                }
+            }
+        });
+    }
+
+    private String getStrBtwSpaceAndPercent(String textMessage) {
+        return textMessage.substring(textMessage.lastIndexOf(" ") + 1, textMessage.lastIndexOf("%"));
     }
 
 }

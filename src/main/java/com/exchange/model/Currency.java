@@ -50,20 +50,8 @@ public class Currency implements Cloneable {
     protected String value;
     @XmlAttribute(name = "ID", required = true)
     protected String id;
-    @XmlTransient
-    private boolean isSelected;
 
-    public Currency() {
-        this.isSelected = false;
-    }
-
-    public boolean isSelected() {
-        return isSelected;
-    }
-
-    public void changeSelect() {
-        isSelected = !this.isSelected;
-    }
+    public Currency() {}
 
     /**
      * Gets the value of the numCode property.
@@ -195,7 +183,7 @@ public class Currency implements Cloneable {
 
     @Override
     public String toString() {
-        return "Valute{" +
+        return "Currency{" +
                 "numCode=" + numCode +
                 ", charCode='" + charCode + '\'' +
                 ", nominal=" + nominal +
